@@ -30,13 +30,6 @@ def get_action(modify, action):
     
     return action
 
-def get_league_info(league, drafts):
-    league_info = Leagues.get_league(league)
-    rosters = Leagues.get_rosters(league)
-    draft = Drafts.get_specific_draft(drafts)
-    users = Leagues.get_users(league) 
-    return league_info, rosters, users, draft
-
 def graphql_req(operation, league, player, draft = 0, slot = 0, value = 0):
     headers = {'Authorization': args['auth'],
                'Content-Type': 'application/json',
