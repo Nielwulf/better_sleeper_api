@@ -42,24 +42,28 @@ def graphql_req(operation, league, player, draft = 0, slot = 0, value = 0):
         body = update_draft('draft_force_auction_pick', player, draft, slot, value)
         return (requests.request("POST", "https://sleeper.com/graphql", headers=headers, data=body)).json()
 
-def mod_one_team(dict, roster):
+def mod_one_team(dict, roster, slotid):
     print(f"Modifying {dict['display_name']}")
-    keepers = build_keeper_dict(dict['id'], roster['keepers'])
+    keepers = build_keeper_dict(dict['id'], roster, slotid)
+    print(keepers)
+
+    for keeper in keeper_dict:
+        graphql_req('draft_force_auction_pick', league, keeper, draft['draft_id'], slotid, keeper_value)        
         
-def build_keeper_dict(user, keepers):
+def build_keeper_dict(user, roster, slotid):
     print('Building keeper list')
-    for keeper in keepers:
+    for keeper in roster['keepers']:
         keeper_info = get_sleeper_req('player', keeper)
         keeper_name = f"{keeper_info['first_name']} {keeper_info['last_name']}"
         keeper_tran = graphql_req('league_transactions_by_player', league, keeper)
         keeper_value = proc_trans(keeper_tran, keeper)
-        slotid = list(slot_to_roster.keys())[list(slot_to_roster.values()).index(roster_dict[user_id]['roster_id'])]
-        keeper_dict[user_id] = {'name': keeper_name,
-                                'roster_id': roster_dict[user_id]['roster_id'],
+        keeper_dict[keeper] =  {'name': keeper_name,
+                                'roster_id': roster['roster_id'],
                                 'slot_id': slotid,
                                 'player_id': keeper, 
                                 'value': keeper_value}
     
+    return keeper_dict                                
 
 def proc_trans(json, player, trans_value = None, index = -1):
     transactions = json['data']['league_transactions_by_player']
@@ -138,29 +142,10 @@ def mod_league(rosters, users, league, draft, modify = '', roster_dict = {}, kee
                     
             user_id = int(input("Who's keepers would you like to modify? [User id]: \n"))            
             roster = roster_dict[user_id]
-            mod_one_team(user_dict[user_id], roster)
-                    
-            for roster in rosters:
-                roster_dict[int(roster["owner_id"])] = roster
-                
-            print('Here are all the team names and IDs')
-            for user in users:
-                print(f"User name, User id: {user['display_name']}, {user['user_id']}")
-                
-            user_id = int(input("Who's keepers would you like to modify? [User id]: \n"))
-            keeper_dict = {}
-            for keeper in roster_dict[user_id]['keepers']:
-                keeper_info = get_sleeper_req('player', keeper)
-                keeper_name = f"{keeper_info['first_name']} {keeper_info['last_name']}"
-                keeper_tran = graphql_req('league_transactions_by_player', league, keeper)
-                keeper_value = proc_trans(keeper_tran, keeper)
-                slotid = list(slot_to_roster.keys())[list(slot_to_roster.values()).index(roster_dict[user_id]['roster_id'])]
-                keeper_dict[keeper_name] = {'roster_id': roster_dict[user_id]['roster_id'],
-                                            'slot_id': slotid,
-                                            'player_id': keeper, 
-                                            'value': keeper_value}
-                
-            print(keeper_dict)
+            slotid = list(slot_to_roster.keys())[list(slot_to_roster.values()).index(roster['roster_id'])]
+            mod_one_team(user_dict[user_id], roster, slotid)
+
+
             
             for keeper in keeper_dict:
                 graphql_req('draft_force_auction_pick', league, keeper, draft['draft_id'], slotid, keeper_value)        
