@@ -53,7 +53,8 @@ def mod_one_team(league, user_dict, roster, slotid):
     print(f"League member {user_dict['display_name']} keepers have been updated.")
         
 def mod_all_teams(league, rosters, slotids):
-    print('help')
+    print('')
+    return ''
 
 def build_keeper_dict(league, roster, slotid):
     print('Building keeper list')
@@ -136,7 +137,8 @@ def mod_league(rosters, users, league, draft, modify = '', roster_dict = {}, kee
         if modify == 'x':
             break
         elif modify == 'a':
-            print('All teams')            
+            print('Modifying all teams is still under construction')
+            modify = mod_all_teams(league, rosters, slot_to_roster)            
         elif modify == 'o':
             print('Modifying a single team')
             print('Here are all the team names and IDs')    
