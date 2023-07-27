@@ -5,7 +5,6 @@ import sys
 import requests
 from urllib.error import HTTPError
 import datetime as dt
-import json
 from math import ceil
 from ffb_class import League
 from query import transaction_check, update_draft
@@ -184,7 +183,6 @@ def mod_league(l, modify = '', roster_dict = {}):
         else:
             print('Please select [a]ll, [o]ne team, e[x]it')
         
-    
 if __name__ == "__main__":
     try: 
         auth = args['auth']
