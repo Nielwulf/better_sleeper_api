@@ -39,7 +39,7 @@ def graphql_req(operation, league, player, slot = 0, value = 0):
         return (requests.request("POST", "https://sleeper.com/graphql", headers=headers, data=body)).json()
         
     elif operation == 'draft_force_auction_pick':
-        body = update_draft('draft_force_auction_pick', player, args['draftid'], slot, value)
+        body = update_draft(operation, player, args['draftid'], slot, value)
         requests.request("POST", "https://sleeper.com/graphql", headers=headers, data=body)
 
 def mod_one_team(league, user_dict, roster, slotid, action):
@@ -52,12 +52,22 @@ def mod_one_team(league, user_dict, roster, slotid, action):
         
     print(f"League member {user_dict['display_name']} keepers have been updated.")
         
-def mod_all_teams(l, slotids):
-    print('')
-    return ''
-
-def list_all_values(l, user_dicts):
-    print('List of keeper values for all members of a team')
+def mod_all_teams(l, slotids, index = 0):
+    print('Modifying all teams keeper values')
+    keepers = {}
+    for roster in l.rosters:
+        slotid = list(slotids.keys())[list(slotids.values()).index(roster['roster_id'])]
+        try:
+            keepers[index] = build_keeper_dict(l.leagueid, roster, slotid, action='m')
+            index = index + 1
+        except:
+            print('No keepers have been selected')
+            continue
+        
+    for keeper in keepers.items():
+        playerlist = list(keeper[1].keys())
+        for player in playerlist:
+            graphql_req('draft_force_auction_pick', l.leagueid, keeper[1][player]['player_id'], keeper[1][player]['slot_id'], keeper[1][player]['value'])        
 
 def build_keeper_dict(league, roster, slotid, action):
     print('Building keeper list')
@@ -143,7 +153,7 @@ Postion: {player_info['position']}
         keeper_info = get_sleeper_req('player', keeper)
         print(f"Postion: {keeper_info['position']}, Name: {keeper_info['first_name']} {keeper_info['last_name']}")
         
-def mod_league(l, modify = '', roster_dict = {}, keeper_dict = {}):
+def mod_league(l, modify = '', roster_dict = {}):
     slot_to_roster = l.draft['slot_to_roster_id']
     print('Building roster list')
     for roster in l.rosters:
@@ -154,8 +164,8 @@ def mod_league(l, modify = '', roster_dict = {}, keeper_dict = {}):
         if modify == 'x':
             break
         elif modify == 'a':
-            print('Modifying all teams is still under construction')
-            modify = mod_all_teams(l.leagueid, l.rosters, slot_to_roster)            
+            mod_all_teams(l, slot_to_roster)    
+            print('All keepers have been updated')        
         elif modify == 'o':
             print('Modifying a single team')
             print('Here are all the team names and IDs')    
