@@ -1,6 +1,6 @@
 import json
 
-transaction = """
+transaction_metadata = """
           adds
           consenter_ids
           created
@@ -22,7 +22,7 @@ transaction = """
     ]
     """
     
-draft = """
+draft_metadata = """
         draft_id
         pick_no
         player_id
@@ -34,8 +34,8 @@ draft = """
     """
   
 def update_draft(operation, player, draft, slot, value):
-  query_line = f'mutation {operation} [\n       {operation}(sport: \"nfl\", player_id: \"{player}\", draft_id: \"{draft}\", slot: \"{slot}\", amount: \"{value}\", is_keeper: true)]'
-  query_line = query_line + draft
+  query_line = f"mutation {operation} [\n       {operation}(sport: \"nfl\", player_id: \"{player}\", draft_id: \"{draft}\", slot: {slot}, amount: {value}, is_keeper: true)["
+  query_line = query_line + draft_metadata
   query_line = query_line.replace("[","{")
   query_line = query_line.replace("]","}")
   return json.dumps({
@@ -46,7 +46,7 @@ def update_draft(operation, player, draft, slot, value):
 
 def transaction_check(operation, league, player):
   query_line = f'query {operation} [\n        {operation}(league_id: \"{league}\", player_id: \"{player}\")['
-  query_line = query_line + transaction
+  query_line = query_line + transaction_metadata
   query_line = query_line.replace("[","{")
   query_line = query_line.replace("]","}")
   return json.dumps({
