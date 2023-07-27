@@ -42,9 +42,9 @@ def graphql_req(operation, league, player, slot = 0, value = 0):
         body = update_draft('draft_force_auction_pick', player, args['draftid'], slot, value)
         requests.request("POST", "https://sleeper.com/graphql", headers=headers, data=body)
 
-def mod_one_team(league, user_dict, roster, slotid):
+def mod_one_team(league, user_dict, roster, slotid, action):
     print(f"Modifying {user_dict['display_name']}")
-    keepers = build_keeper_dict(league, roster, slotid)
+    keepers = build_keeper_dict(league, roster, slotid, action)
 
     for keeper in keepers.items():
         print(keeper[1]['name'])
@@ -52,18 +52,21 @@ def mod_one_team(league, user_dict, roster, slotid):
         
     print(f"League member {user_dict['display_name']} keepers have been updated.")
         
-def mod_all_teams(league, rosters, slotids):
+def mod_all_teams(l, slotids):
     print('')
     return ''
 
-def build_keeper_dict(league, roster, slotid):
+def list_all_values(l, user_dicts):
+    print('List of keeper values for all members of a team')
+
+def build_keeper_dict(league, roster, slotid, action):
     print('Building keeper list')
     keeper_dict = {}
     for keeper in roster['keepers']:
         keeper_info = get_sleeper_req('player', keeper)
         keeper_name = f"{keeper_info['first_name']} {keeper_info['last_name']}"
         keeper_tran = graphql_req('league_transactions_by_player', league, keeper)
-        keeper_value = proc_trans(keeper_tran, keeper)
+        keeper_value = proc_trans(keeper_tran, keeper, action)
         keeper_dict[int(keeper)] =  {
                                     'name' : keeper_name,
                                     'roster_id' : roster['roster_id'],
@@ -74,24 +77,32 @@ def build_keeper_dict(league, roster, slotid):
     
     return dict(keeper_dict)                              
 
-def proc_trans(json, player, trans_value = None, index = -1):
+def proc_trans(json, player, action, trans_value = None, index = -1):
     transactions = json['data']['league_transactions_by_player']
     print(f"{transactions[index]['player_map'][player]['first_name']} {transactions[index]['player_map'][player]['last_name']}")
     while trans_value == None:
         tran_date = dt.datetime.fromtimestamp(transactions[index]['status_updated']/1000)
         if transactions[index]['type'] == 'draft_pick' and tran_date < dt.datetime(2022, 8, 27):
-            print('Twas a bad draft transaction')
-            print(f'This is when the {transactions[index]["type"]} happened, {tran_date}')
             index = index - 1
         elif transactions[index]['type'] == 'draft_pick':
-            trans_value = transactions[index]['metadata']['amount']
+            try:
+                trans_value = transactions[index]['metadata']['amount']
+            except:
+                index = index -1
         elif transactions[index]['type'] == 'waiver':
-            trans_value = transactions[index]['settings']['waiver_bid']
+            try:
+                trans_value = transactions[index]['settings']['waiver_bid']
+            except:
+                index = index - 1
             
-    print(f'Here is the current salary: {trans_value}')
     new_value = ceil((float(trans_value) * 1.1) + 5)
+    print(f'Here is the current salary: {trans_value}')
     print(f'Here is the new salary: {new_value}')
-    return new_value    
+    
+    if action == 'm':
+        return new_value
+    elif action == 't':
+        return ''
          
 def get_sleeper_req(request_type, player):
     headers = {'Authorization': args['auth']}
@@ -108,28 +119,34 @@ def get_sleeper_req(request_type, player):
         else:
             return r.json()
 
-def get_team_info(rosters, users, roster_dict = {}):
-    for roster in rosters:
+def get_team_info(l, action, roster_dict = {}):
+    for roster in l.rosters:
         roster_dict[roster["owner_id"]] = roster
         
     print('Here are all the team names and IDs')
-    for user in users:
+    for user in l.users:
         print(f"User name, User id: {user['display_name']}, {user['user_id']}")
         
     user_id = input('What roster would you like to look up? [User id]: \n')
 
     for player in roster_dict[user_id]['players']:
         player_info = get_sleeper_req('player', player)
-        print(f"Postion: {player_info['position']}, Name: {player_info['first_name']} {player_info['last_name']}")
+        keeper_tran = graphql_req('league_transactions_by_player', l.leagueid, player)
+        print(
+f"""\
+Name: {player_info['first_name']} {player_info['last_name']}
+Postion: {player_info['position']}
+{proc_trans(keeper_tran, player, action)}\
+""")
     print('Keepers')
     for keeper in roster_dict[user_id]['keepers']:
         keeper_info = get_sleeper_req('player', keeper)
         print(f"Postion: {keeper_info['position']}, Name: {keeper_info['first_name']} {keeper_info['last_name']}")
         
-def mod_league(rosters, users, league, draft, modify = '', roster_dict = {}, keeper_dict = {}):
-    slot_to_roster = draft['slot_to_roster_id']
+def mod_league(l, modify = '', roster_dict = {}, keeper_dict = {}):
+    slot_to_roster = l.draft['slot_to_roster_id']
     print('Building roster list')
-    for roster in rosters:
+    for roster in l.rosters:
         roster_dict[int(roster['owner_id'])] = roster
         
     while modify not in ('a','o','x'):
@@ -138,12 +155,12 @@ def mod_league(rosters, users, league, draft, modify = '', roster_dict = {}, kee
             break
         elif modify == 'a':
             print('Modifying all teams is still under construction')
-            modify = mod_all_teams(league, rosters, slot_to_roster)            
+            modify = mod_all_teams(l.leagueid, l.rosters, slot_to_roster)            
         elif modify == 'o':
             print('Modifying a single team')
             print('Here are all the team names and IDs')    
             user_dict = {}
-            for user in users:
+            for user in l.users:
                 user_dict[int(user['user_id'])] = {
                     'id': user['user_id'],
                     'display_name': user['display_name']
@@ -153,7 +170,7 @@ def mod_league(rosters, users, league, draft, modify = '', roster_dict = {}, kee
             user_id = int(input("Who's keepers would you like to modify? [User id]: \n"))            
             roster = roster_dict[user_id]
             slotid = list(slot_to_roster.keys())[list(slot_to_roster.values()).index(roster['roster_id'])]
-            mod_one_team(league, user_dict[user_id], roster, slotid)
+            mod_one_team(l.leagueid, user_dict[user_id], roster, slotid, action)
         else:
             print('Please select [a]ll, [o]ne team, e[x]it')
         
@@ -193,7 +210,7 @@ if __name__ == "__main__":
             sys.exit(0)
         elif action =='t':
             print('getting Team info')
-            get_team_info(l.rosters, l.users)
+            get_team_info(l, action)
         elif action == 'm':
             print('Modifying League')
-            mod_league(l.rosters, l.users, args['leagueid'], l.draft)
+            mod_league(l, action)
