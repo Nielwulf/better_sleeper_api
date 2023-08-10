@@ -92,17 +92,23 @@ def proc_trans(json, player, action, trans_value = None, index = -1):
     while trans_value == None:
         tran_date = dt.datetime.fromtimestamp(transactions[index]['status_updated']/1000)
         if transactions[index]['type'] == 'draft_pick' and tran_date < dt.datetime(2022, 8, 27):
+            print('Original Seed Draft draft')
             index = index - 1
         elif transactions[index]['type'] == 'draft_pick':
             try:
                 trans_value = transactions[index]['metadata']['amount']
+                print('Draft pick')
             except:
                 index = index -1
         elif transactions[index]['type'] == 'waiver':
             try:
                 trans_value = transactions[index]['settings']['waiver_bid']
+                print('Waiver Pickup')
             except:
                 index = index - 1
+        else:
+            print('someone did something naughty')
+            index = index - 1
             
     new_value = ceil((float(trans_value) * 1.1) + 5)
     print(f'Here is the current salary: {trans_value}')
@@ -143,7 +149,6 @@ def get_team_info(l, action, roster_dict = {}):
         keeper_tran = graphql_req('league_transactions_by_player', l.leagueid, player)
         print(
 f"""\
-Name: {player_info['first_name']} {player_info['last_name']}
 Postion: {player_info['position']}
 {proc_trans(keeper_tran, player, action)}\
 """)
