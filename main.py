@@ -92,7 +92,6 @@ def proc_trans(json, player, action, trans_value = None, index = -1):
     while trans_value == None:
         tran_date = dt.datetime.fromtimestamp(transactions[index]['status_updated']/1000)
         if transactions[index]['type'] == 'draft_pick' and tran_date < dt.datetime(2022, 8, 27):
-            print('Original Seed Draft draft')
             index = index - 1
         elif transactions[index]['type'] == 'draft_pick':
             try:
@@ -112,12 +111,9 @@ def proc_trans(json, player, action, trans_value = None, index = -1):
             
     new_value = ceil((float(trans_value) * 1.1) + 5)
     print(f'Here is the current salary: {trans_value}')
-    print(f'Here is the new salary: {new_value}')
+    print(f'Here is the new salary: {new_value} \n')
     
-    if action == 'm':
-        return new_value
-    elif action == 't':
-        return ''
+    return new_value
          
 def get_sleeper_req(request_type, player):
     headers = {'Authorization': args['auth']}
@@ -144,18 +140,35 @@ def get_team_info(l, action, roster_dict = {}):
         
     user_id = input('What roster would you like to look up? [User id]: \n')
 
+    team_roster = {}
     for player in roster_dict[user_id]['players']:
         player_info = get_sleeper_req('player', player)
+        player_name = f"{player_info['first_name']} {player_info['last_name']}"
         keeper_tran = graphql_req('league_transactions_by_player', l.leagueid, player)
-        print(
-f"""\
-Postion: {player_info['position']}
-{proc_trans(keeper_tran, player, action)}\
-""")
-    print('Keepers')
-    for keeper in roster_dict[user_id]['keepers']:
-        keeper_info = get_sleeper_req('player', keeper)
-        print(f"Postion: {keeper_info['position']}, Name: {keeper_info['first_name']} {keeper_info['last_name']}")
+        value = proc_trans(keeper_tran, player, action)
+        if player in roster_dict[user_id]['keepers']:
+            keeper = True
+        else:
+            keeper = False
+            
+        player_dict = {
+            "Name": player_name,
+            "Position": player_info['position'],
+            "Keeper": keeper,
+            "Keeper Value": value
+        }
+        team_roster[player_name] = player_dict
+        
+    print('***Keepers***')
+    for player in team_roster:
+        if team_roster[player]['Keeper']:
+            print(
+f"""
+Name: {team_roster[player]['Name']}
+Position: {team_roster[player]['Position']}
+Keeper Value: {team_roster[player]['Keeper Value']}\
+"""
+)
         
 def mod_league(l, modify = '', roster_dict = {}):
     slot_to_roster = l.draft['slot_to_roster_id']
