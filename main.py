@@ -8,6 +8,8 @@ import datetime as dt
 from math import ceil
 from ffb_class import League
 from query import transaction_check, update_draft
+import pandas as pd
+from pathlib import Path
 
 if platform.system() == "Windows": os.system('cls')
 ap = argparse.ArgumentParser(description='App with a deeper Sleeper API integration.')
@@ -23,9 +25,9 @@ args = vars(ap.parse_args())
 def get_action(modify, action):
     print('What would you like to do?\n')
     if modify != True:
-        action = input('get [t]eam info, e[x]it:\n').lower()
+        action = input('get [t]eam info, [b]uild league report, e[x]it:\n').lower()
     else:
-        action = input('get [t]eam info, [m]odify league, e[x]it:\n').lower()
+        action = input('get [t]eam info, [b]uld league report, [m]odify league, e[x]it:\n').lower()
     
     return action
 
@@ -88,7 +90,6 @@ def build_keeper_dict(league, roster, slotid, action):
 
 def proc_trans(json, player, action, trans_value = None, index = -1):
     transactions = json['data']['league_transactions_by_player']
-    print(f"{transactions[index]['player_map'][player]['first_name']} {transactions[index]['player_map'][player]['last_name']}")
     while trans_value == None:
         tran_date = dt.datetime.fromtimestamp(transactions[index]['status_updated']/1000)
         if transactions[index]['type'] == 'draft_pick' and tran_date < dt.datetime(2022, 8, 27):
@@ -96,24 +97,27 @@ def proc_trans(json, player, action, trans_value = None, index = -1):
         elif transactions[index]['type'] == 'draft_pick':
             try:
                 trans_value = transactions[index]['metadata']['amount']
-                print('Draft pick')
             except:
                 index = index -1
         elif transactions[index]['type'] == 'waiver':
             try:
                 trans_value = transactions[index]['settings']['waiver_bid']
-                print('Waiver Pickup')
             except:
                 index = index - 1
         else:
-            print('someone did something naughty')
             index = index - 1
             
+    trans_type = transactions[index]['type']
     new_value = ceil((float(trans_value) * 1.1) + 5)
-    print(f'Here is the current salary: {trans_value}')
-    print(f'Here is the new salary: {new_value} \n')
     
-    return new_value
+    tran_dict = {
+        'Name': f"{transactions[index]['player_map'][player]['first_name']} {transactions[index]['player_map'][player]['last_name']}",
+        'Acquisition Type': trans_type,
+        'Initial Value': f'${int(trans_value)}',
+        'Keeper Value': f'${new_value}'
+    }
+    
+    return tran_dict
          
 def get_sleeper_req(request_type, player):
     headers = {'Authorization': args['auth']}
@@ -134,42 +138,90 @@ def get_team_info(l, action, roster_dict = {}):
     for roster in l.rosters:
         roster_dict[roster["owner_id"]] = roster
         
-    print('Here are all the team names and IDs')
-    for user in l.users:
-        print(f"User name, User id: {user['display_name']}, {user['user_id']}")
-        
-    user_id = input('What roster would you like to look up? [User id]: \n')
-
-    team_roster = {}
-    for player in roster_dict[user_id]['players']:
-        player_info = get_sleeper_req('player', player)
-        player_name = f"{player_info['first_name']} {player_info['last_name']}"
-        keeper_tran = graphql_req('league_transactions_by_player', l.leagueid, player)
-        value = proc_trans(keeper_tran, player, action)
-        if player in roster_dict[user_id]['keepers']:
-            keeper = True
-        else:
-            keeper = False
+    if action == 'b':
+        build_league_report(l, roster_dict)
+    else:  
+        print('Here are all the team names and IDs')
+        for user in l.users:
+            print(f"User name, User id: {user['display_name']}, {user['user_id']}")
             
-        player_dict = {
-            "Name": player_name,
-            "Position": player_info['position'],
-            "Keeper": keeper,
-            "Keeper Value": value
-        }
-        team_roster[player_name] = player_dict
-        
-    print('***Keepers***')
-    for player in team_roster:
-        if team_roster[player]['Keeper']:
-            print(
+        user_id = input('What roster would you like to look up? [User id]: \n')
+
+        team_roster = {}
+        for player in roster_dict[user_id]['players']:
+            player_info = get_sleeper_req('player', player)
+            player_name = f"{player_info['first_name']} {player_info['last_name']}"
+            keeper_tran = graphql_req('league_transactions_by_player', l.leagueid, player)
+            tran_dict = proc_trans(keeper_tran, player, action)
+            if player in roster_dict[user_id]['keepers']:
+                keeper = True
+            else:
+                keeper = False
+                
+            player_dict = {
+                "Name": player_name,
+                "Position": player_info['position'],
+                "Keeper": keeper,
+                "Keeper Value": tran_dict['Keeper Value']
+            }
+            team_roster[player_name] = player_dict
+            
+        print('***Keepers***')
+        for player in team_roster:
+            if team_roster[player]['Keeper']:
+                print(
 f"""
 Name: {team_roster[player]['Name']}
 Position: {team_roster[player]['Position']}
 Keeper Value: {team_roster[player]['Keeper Value']}\
 """
 )
+            
+def build_league_report(l, rosters):
+    print('Generating league Report')
+    home = str(Path.home())
+    if platform.system() == "Windows":
+        write_path = f'{home}\\ff_league\\'
+    else:
+        write_path = f'{home}/ff_league/'
+    print (f'OS: {platform.system()} Path: {write_path}')
+    os.system(f'mkdir {write_path}')    
+    writer = pd.ExcelWriter(f'{write_path}2022_League_Keeper_info.xlsx', engine='xlsxwriter')
+    workbook = writer.book
+    center_format = workbook.add_format()
+    center_format.set_align('center')
+    
+    for user in l.users:
+        user_dict = rosters[user['user_id']]
+        user_name = user['display_name']
+        roster = user_dict['players']
+        keepers = user_dict['keepers']
+        print(f'Creating player roster for {user_name}')
+        players_df = pd.DataFrame(columns=['Name', 'Acquisition Type', 'Initial Value', 'Keeper Value', 'Keeper'])
+        for player in roster:
+            tran_list = []
+            keeper_tran = graphql_req('league_transactions_by_player', l.leagueid, player)
+            tran_dict = proc_trans(keeper_tran, player, action)
+            for key in tran_dict:
+                tran_list.append(tran_dict[key])
+                    
+            if player in keepers:
+                tran_list.append('Yes')
+            else:
+                tran_list.append('No')
+            players_df.loc[len(players_df)] = tran_list
         
+        players_df.set_index('Name')
+        players_df.to_excel(writer, sheet_name=f'{user_name}', index=False)
+        for column in players_df:
+            column_length = max(players_df[column].astype(str).map(len).max(), len(column))
+            col_idx = players_df.columns.get_loc(column)
+            writer.sheets[user_name].set_column(col_idx, col_idx, column_length)
+            if column in ('Initial Value', 'Keeper Value'):
+                writer.sheets[user_name].set_column(2, 3, column_length, center_format)
+                
+    writer.close()
+            
 def mod_league(l, modify = '', roster_dict = {}):
     slot_to_roster = l.draft['slot_to_roster_id']
     print('Building roster list')
@@ -234,7 +286,7 @@ if __name__ == "__main__":
         if action == 'x':
             print('Thanks for using the app, closing now')
             sys.exit(0)
-        elif action =='t':
+        elif action in ('t', 'b'):
             print('getting Team info')
             get_team_info(l, action)
         elif action == 'm':
