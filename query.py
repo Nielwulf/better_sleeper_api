@@ -34,7 +34,7 @@ draft_metadata = """
     """
   
 def update_draft(operation, player, draft, slot, value):
-  query_line = f"mutation {operation} [\n       {operation}(sport: \"nfl\", player_id: \"{player}\", draft_id: \"{draft}\", slot: {slot}, amount: {value}, is_keeper: true)["
+  query_line = f"mutation {operation} [\n       {operation}(sport: \"nfl\", player_id: \"{player}\", draft_id: \"{draft}\", slot: {slot}, amount: {value['Keeper Value']}, is_keeper: true)["
   query_line = query_line + draft_metadata
   query_line = query_line.replace("[","{")
   query_line = query_line.replace("]","}")

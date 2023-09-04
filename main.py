@@ -113,8 +113,8 @@ def proc_trans(json, player, action, trans_value = None, index = -1):
     tran_dict = {
         'Name': f"{transactions[index]['player_map'][player]['first_name']} {transactions[index]['player_map'][player]['last_name']}",
         'Acquisition Type': trans_type,
-        'Initial Value': f'${int(trans_value)}',
-        'Keeper Value': f'${new_value}'
+        'Initial Value': f'{int(trans_value)}',
+        'Keeper Value': f'{new_value}'
     }
     
     return tran_dict
@@ -173,7 +173,7 @@ def get_team_info(l, action, roster_dict = {}):
 f"""
 Name: {team_roster[player]['Name']}
 Position: {team_roster[player]['Position']}
-Keeper Value: {team_roster[player]['Keeper Value']}\
+Keeper Value: ${team_roster[player]['Keeper Value']}\
 """
 )
             
@@ -186,7 +186,7 @@ def build_league_report(l, rosters):
         write_path = f'{home}/ff_league/'
     print (f'OS: {platform.system()} Path: {write_path}')
     os.system(f'mkdir {write_path}')    
-    writer = pd.ExcelWriter(f'{write_path}2022_League_Keeper_info.xlsx', engine='xlsxwriter')
+    writer = pd.ExcelWriter(f'{write_path}2023_League_Keeper_info.xlsx', engine='xlsxwriter')
     workbook = writer.book
     center_format = workbook.add_format()
     center_format.set_align('center')
