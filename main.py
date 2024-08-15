@@ -17,9 +17,9 @@ ap = argparse.ArgumentParser(description='App with a deeper Sleeper API integrat
 ap._action_groups.pop()
 required = ap.add_argument_group('required arguments')
 optional = ap.add_argument_group('optional arguments')
-required.add_argument('-a', '--auth', type=str, required=True, help='Authentication needed to edit ANY Sleeper platform information.')
-required.add_argument('-l', '--leagueid', type=str, required=True, help='The numerical Sleeper league ID you wish to read/write.')
-required.add_argument('-d', '--draftid', type=str, required=True, help="This season's Draft ID.")
+optional.add_argument('-a', '--auth', type=str, required=True, help='Authentication needed to edit ANY Sleeper platform information.')
+optional.add_argument('-l', '--leagueid', type=str, required=True, help='The numerical Sleeper league ID you wish to read/write.')
+optional.add_argument('-d', '--draftid', type=str, required=True, help="This season's Draft ID.")
 optional.add_argument('-m', '--modify', action="store_true", required=False, default=False, help='Flag needed if you plan to make changes.')
 args = vars(ap.parse_args())
 
@@ -73,14 +73,14 @@ def mod_all_teams(l, slotids, index = 0):
         for player in playerlist:
             graphql_req('draft_force_auction_pick', l.leagueid, keeper[1][player]['player_id'], keeper[1][player]['slot_id'], keeper[1][player]['value'])        
 
-def build_keeper_dict(league, roster, slotid, action):
+def build_keeper_dict(league, roster, slotid):
     print('Building keeper list')
     keeper_dict = {}
     for keeper in roster['keepers']:
         keeper_info = get_sleeper_req('player', keeper)
         keeper_name = f"{keeper_info['first_name']} {keeper_info['last_name']}"
         keeper_tran = graphql_req('league_transactions_by_player', league, keeper)
-        keeper_value = proc_trans(keeper_tran, keeper, action)
+        keeper_value = proc_trans(keeper_tran, keeper)
         keeper_dict[int(keeper)] =  {
                                     'name' : keeper_name,
                                     'roster_id' : roster['roster_id'],
@@ -111,12 +111,11 @@ def proc_trans(json, player, trans_value = None, index = -1):
         else:
             index = index - 1
             
-    trans_type = transactions[index]['type']
     new_value = ceil((float(trans_value) * 1.1) + 5)
     
     tran_dict = {
         'Name': f"{transactions[index]['player_map'][player]['first_name']} {transactions[index]['player_map'][player]['last_name']}",
-        'Acquisition Type': trans_type,
+        'Acquisition Type': transactions[index]['type'],
         'Initial Value': f'{int(trans_value)}',
         'Keeper Value': f'{new_value}'
     }
@@ -205,7 +204,7 @@ def build_league_report(l, rosters):
         for player in roster:
             tran_list = []
             keeper_tran = graphql_req('league_transactions_by_player', l.leagueid, player)
-            tran_dict = proc_trans(keeper_tran, player, action)
+            tran_dict = proc_trans(keeper_tran, player)
             for key in tran_dict:
                 tran_list.append(tran_dict[key])
                     
@@ -262,8 +261,7 @@ if __name__ == "__main__":
         auth = args['auth']
         print('Authorization credentials have been provided.')
     except:
-        print('Authorization credentials have not been provided, follow the instructions in the README on how to get it.')
-        sys.exit(1)
+        auth = input('Please enter your authorization code, follow the instructions in the README on how to get it.')
         
     try:
         draft = args['draftid']
@@ -280,8 +278,8 @@ if __name__ == "__main__":
         print(f"League ID has been provided: {args['leagueid']}")
         l = League(args['leagueid'], draft)
     except:
-        print('No league ID has been provided')
-        sys.exit(1)
+        leagueid = input('What is your league ID?')
+        l = League(leagueid, draft)
         
     action = ''
     while action != 'x':
