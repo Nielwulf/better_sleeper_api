@@ -10,6 +10,7 @@ from ffb_class import League
 from query import transaction_check, update_draft
 import pandas as pd
 from pathlib import Path
+from dateutil.relativedelta import relativedelta
 
 if platform.system() == "Windows": os.system('cls')
 ap = argparse.ArgumentParser(description='App with a deeper Sleeper API integration.')
@@ -21,6 +22,8 @@ required.add_argument('-l', '--leagueid', type=str, required=True, help='The num
 required.add_argument('-d', '--draftid', type=str, required=True, help="This season's Draft ID.")
 optional.add_argument('-m', '--modify', action="store_true", required=False, default=False, help='Flag needed if you plan to make changes.')
 args = vars(ap.parse_args())
+
+DATE = dt.datetime.today()
 
 def get_action(modify, action):
     print('What would you like to do?\n')
@@ -88,11 +91,12 @@ def build_keeper_dict(league, roster, slotid, action):
     
     return dict(keeper_dict)                              
 
-def proc_trans(json, player, action, trans_value = None, index = -1):
+def proc_trans(json, player, trans_value = None, index = -1):
+    prev_year = (DATE - relativedelta(years=1))
     transactions = json['data']['league_transactions_by_player']
     while trans_value == None:
         tran_date = dt.datetime.fromtimestamp(transactions[index]['status_updated']/1000)
-        if transactions[index]['type'] == 'draft_pick' and tran_date < dt.datetime(2022, 8, 27):
+        if transactions[index]['type'] == 'draft_pick' and tran_date < dt.datetime(int(prev_year.strftime('%Y')), 1, 1):
             index = index - 1
         elif transactions[index]['type'] == 'draft_pick':
             try:
@@ -186,7 +190,7 @@ def build_league_report(l, rosters):
         write_path = f'{home}/ff_league/'
     print (f'OS: {platform.system()} Path: {write_path}')
     os.system(f'mkdir {write_path}')    
-    writer = pd.ExcelWriter(f'{write_path}2023_League_Keeper_info.xlsx', engine='xlsxwriter')
+    writer = pd.ExcelWriter(f'{write_path}{DATE.strftime("%Y")}_League_Keeper_info.xlsx', engine='xlsxwriter')
     workbook = writer.book
     center_format = workbook.add_format()
     center_format.set_align('center')
