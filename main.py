@@ -96,20 +96,21 @@ def proc_trans(json, player, trans_value = None, index = -1):
     transactions = json['data']['league_transactions_by_player']
     while trans_value == None:
         tran_date = dt.datetime.fromtimestamp(transactions[index]['status_updated']/1000)
-        if transactions[index]['type'] == 'draft_pick' and tran_date < dt.datetime(int(prev_year.strftime('%Y')), 1, 1):
+        if tran_date < dt.datetime(int(prev_year.strftime('%Y')), 1, 1):
             index = index - 1
-        elif transactions[index]['type'] == 'draft_pick':
-            try:
-                trans_value = transactions[index]['metadata']['amount']
-            except:
-                index = index -1
-        elif transactions[index]['type'] == 'waiver':
-            try:
-                trans_value = transactions[index]['settings']['waiver_bid']
-            except:
-                index = index - 1
         else:
-            index = index - 1
+            if transactions[index]['type'] == 'draft_pick':
+                try:
+                    trans_value = transactions[index]['metadata']['amount']
+                except:
+                    index = index - 1
+            elif transactions[index]['type'] == 'waiver':
+                try:
+                    trans_value = transactions[index]['settings']['waiver_bid']
+                except:
+                    index = index - 1
+            else:
+                index = index - 1
             
     new_value = ceil((float(trans_value) * 1.1) + 5)
     
