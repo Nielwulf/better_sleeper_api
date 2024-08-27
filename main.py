@@ -11,6 +11,7 @@ from query import transaction_check, update_draft
 import pandas as pd
 from pathlib import Path
 from dateutil.relativedelta import relativedelta
+import pprint
 
 if platform.system() == "Windows": os.system('cls')
 ap = argparse.ArgumentParser(description='App with a deeper Sleeper API integration.')
@@ -28,9 +29,9 @@ DATE = dt.datetime.today()
 def get_action(modify, action):
     print('What would you like to do?\n')
     if modify != True:
-        action = input('get [t]eam info, [b]uild league report, e[x]it:\n').lower()
+        action = input('get [t]eam info, [b]uild league report, t[r]ansaction report, e[x]it:\n').lower()
     else:
-        action = input('get [t]eam info, [b]uld league report, [m]odify league, e[x]it:\n').lower()
+        action = input('get [t]eam info, [b]uld league report, t[r]ansaction report, [m]odify league, e[x]it:\n').lower()
     
     return action
 
@@ -256,6 +257,94 @@ def mod_league(l, modify = '', roster_dict = {}):
             mod_one_team(l.leagueid, user_dict[user_id], roster, slotid, action)
         else:
             print('Please select [a]ll, [o]ne team, e[x]it')
+            
+def league_transactions(league, draft, round = 1, full_tran = {}, round_tran = {}, tran_info = {}): 
+    tran_type = (input('What type of transactions do you want? [t]rade, [w]aiver, [a]ll: ')).lower()
+    headers = {'Authorization': args['auth']}
+    if tran_type not in ('t', 'w', 'a'):
+        tran_type = input('Invalid transaction type. Please use: t, w, or a: ')
+    elif tran_type == 't':
+        max_round = 13
+    elif tran_type in ('w', 'a'):
+        max_round = 17
+    draft = (requests.get(f'https://api.sleeper.app/v1/draft/{draft}', headers=headers)).json()
+    
+    while round <= max_round:
+        round_tran = (requests.get(f'https://api.sleeper.app/v1/league/{args["leagueid"]}/transactions/{round}', headers=headers)).json()
+        index = 0
+        print(round)
+        for tran in round_tran:
+            if (tran['type'] == 'free_agent') or (tran['status'] == 'failed') or (tran['status_updated'] < draft['start_time']):
+                continue
+            
+            elif tran['status'] == 'complete':
+                if (tran['type'] == 'trade') and (tran_type == 't'):
+                    full_tran[round] = {}
+                    full_tran[round][index] = {}
+                    owners = []
+                    for owner in tran['roster_ids']:
+                        for roster in league.rosters:
+                            if roster['roster_id'] != owner:
+                                continue
+                            else:
+                                owners.append(roster['owner_id'])
+                                break
+
+                        for owner in owners:
+                            for user in league.users:
+                                if user['user_id'] != owner:
+                                    continue
+                                else:
+                                    owner_name = user['display_name']
+                                    break
+                        
+                        adds = ''
+                        drops = ''
+                        for player in tran['adds'].keys():
+                            if tran['adds'][player] == roster['roster_id']:
+                                player_info = get_sleeper_req('player', player)
+                                player_name = f"{player_info['first_name']} {player_info['last_name']}"
+                                adds = f'{adds} {player_name},'
+                        
+                        for player in tran['drops'].keys():
+                            if tran['drops'][player] == roster['roster_id']:
+                                player_info = get_sleeper_req('player', player)
+                                player_name = f"{player_info['first_name']} {player_info['last_name']}"
+                                drops = f'{drops} {player_name},'
+                        
+                        full_tran[round][index][owner_name] = {
+                                        'adds' : adds[:-1],
+                                        'drops' : drops[:-1]
+                                    }
+                        
+                        if len(tran['draft_picks']) > 0 :
+                            dollars = 0
+                            for pick in tran['draft_picks']:
+                                if pick['round'] == type.__str__:
+                                    dollars = pick['round']
+                                else:
+                                    dollars = dollars + pick['round']
+
+                            for trade in tran['draft_picks']:
+                                if roster['roster_id'] == trade['previous_owner_id']:
+                                    auction = {'lost auction dollars' : dollars}
+                                elif roster['roster_id'] == trade['owner_id']:
+                                    auction = {'gained auction dollars' : dollars}
+                                
+                            full_tran[round][index][owner_name].update(auction)
+
+                    index = index + 1
+                    
+                elif (tran['type'] == 'waiver') and (tran_type == 'w'):
+                    full_tran.append(tran)
+                    index = index + 1
+                elif tran_type == 'a':
+                    full_tran.append(tran)
+                    index = index + 1
+
+        round = round + 1
+    
+    pprint.pp(full_tran)
         
 if __name__ == "__main__":
     try: 
@@ -292,6 +381,9 @@ if __name__ == "__main__":
         elif action in ('t', 'b'):
             print('getting Team info')
             get_team_info(l, action)
+        elif action == 'r':
+            print('Creating transaction list')
+            league_transactions(l, draft)
         elif action == 'm':
             print('Modifying League')
             mod_league(l, action)
