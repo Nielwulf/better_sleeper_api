@@ -49,7 +49,7 @@ def graphql_req(operation, league, player, slot = 0, value = 0):
 
 def mod_one_team(league, user_dict, roster, slotid, action):
     print(f"Modifying {user_dict['display_name']}")
-    keepers = build_keeper_dict(league, roster, slotid, action)
+    keepers = build_keeper_dict(league, roster, slotid)
 
     for keeper in keepers.items():
         print(keeper[1]['name'])
