@@ -63,7 +63,7 @@ def mod_all_teams(l, slotids, index = 0):
     for roster in l.rosters:
         slotid = list(slotids.keys())[list(slotids.values()).index(roster['roster_id'])]
         try:
-            keepers[index] = build_keeper_dict(l.leagueid, roster, slotid, action='m')
+            keepers[index] = build_keeper_dict(l.leagueid, roster, slotid)
             index = index + 1
         except:
             print('No keepers have been selected')
