@@ -274,7 +274,7 @@ def league_transactions(league, draft, round = 1, full_tran = {}, round_tran = {
         index = 0
         print(round)
         for tran in round_tran:
-            if (tran['type'] == 'free_agent') or (tran['status'] == 'failed') or (tran['status_updated'] < draft['start_time']):
+            if (tran['type'] == 'free_agent') or (tran['status'] == 'failed') or (tran['status_updated'] > draft['start_time']):
                 continue
             
             elif tran['status'] == 'complete':
